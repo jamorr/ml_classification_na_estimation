@@ -10,7 +10,7 @@ def plot_cluster_2d(data:np.ndarray,  means:np.ndarray, covar:np.ndarray, labels
     X, Y = np.meshgrid(X1, X2)
     distributions = []
     for m, c in zip(means, covar):
-        distributions.append(multivariate_normal(m, c))
+        distributions.append(multivariate_normal(m, c, allow_singular=True))
 
     pos = np.empty(X.shape + (2,))                # a new array of given shape and type, without initializing entries
     pos[:, :, 0],pos[:, :, 1] = X, Y
@@ -30,13 +30,18 @@ def plot_cluster_2d(data:np.ndarray,  means:np.ndarray, covar:np.ndarray, labels
     plt.show()
 
 def expectation_multi_var(
-    data: np.ndarray, means: np.ndarray, variances: np.ndarray, pi_hat: np.ndarray
+    data: np.ndarray, means: np.ndarray, variances: np.ndarray, pi_hat: np.ndarray, estimate_proportion:bool
 ) -> tuple[np.ndarray, ...]:
     n_dist =  len(means)
     expect_z = np.ndarray((len(data),n_dist), np.float64)
-    for i, (mean, variance) in enumerate(zip(means, variances)):
-        expect_z[:, i] = pi_hat[i] * multivariate_normal.pdf(data, mean, variance, allow_singular=True)
-    likelihood = np.sum(np.log(expect_z.sum(0)))
+    if estimate_proportion:
+        for i, (mean, variance) in enumerate(zip(means, variances)):
+            expect_z[:, i] = pi_hat[i] * multivariate_normal.pdf(data, mean, variance, allow_singular=True)
+    else:
+        for i, (mean, variance) in enumerate(zip(means, variances)):
+            expect_z[:, i] = multivariate_normal.pdf(data, mean, variance, allow_singular=True)
+    # likelihood = np.sum(np.log(expect_z.sum(0)))
+    likelihood = np.array([12])
     # pi hat is the predicted proportion of points which are part of each hidden variable
     # sum weights of each hidden variable as a proportion of the
     # total number of weights for all hidden variables (of the same category like clusters)
@@ -44,21 +49,25 @@ def expectation_multi_var(
 
 
 def new_hyp_mutli_var(
-    data: np.ndarray, means: np.ndarray, variances: np.ndarray, pi_hat: np.ndarray
+    data: np.ndarray, means: np.ndarray, variances: np.ndarray, pi_hat: np.ndarray, estimate_proportion:bool
 ) -> tuple[np.ndarray, ...]:
     # expectation values shape == len(data) x n_dist
-    expect, likelihood = expectation_multi_var(data, means, variances, pi_hat)
+    expect, likelihood = expectation_multi_var(data, means, variances, pi_hat, estimate_proportion)
 
     # sum of weights for each hidden variable
     # weighted sum of data over sum of weights for each hidden variab;e
-    new_means: np.ndarray = np.array(
-        [
-            np.average(
-                data, axis=0, weights=e
-            )
-            for e in expect.T
-        ]
-    )
+    try:
+        new_means: np.ndarray = np.array(
+            [
+                np.average(
+                    data, axis=0, weights=e
+                )
+                for e in expect.T
+            ]
+        )
+    except ZeroDivisionError as e:
+        print(expect)
+        raise e
     new_cov:np.ndarray = np.array(
         [
             np.cov(data.T, ddof = 0, aweights=e) for e in expect.T
@@ -69,12 +78,12 @@ def new_hyp_mutli_var(
 
 
 def expectation_max_multi_var(
-    data: np.ndarray, number_of_distributions: int, stop: float = float("-inf"), iterations:int = 1000
-) -> tuple[np.ndarray, ...]:
+    data: np.ndarray, number_of_distributions: int, stop: float = float("-inf"), iterations:int = 1000, estimate_proportion:bool=True) -> tuple[np.ndarray, ...]:
     # generate intial guesses for means and variances
     means = (
         rng.random((number_of_distributions, data.shape[1]), np.float64) + data.mean()
     )
+    # means = data[:number_of_distributions, :]
     variance = rng.random(
         (number_of_distributions, data.shape[1]), np.float64
     )
@@ -96,10 +105,13 @@ def expectation_max_multi_var(
     i = 0
     while k > stop and i < iterations:
         # get new mean/var
-        means, variance, pi_hat, likelihood = new_hyp_mutli_var(data, means, variance, pi_hat)
+        means, variance, pi_hat, likelihood = new_hyp_mutli_var(data, means, variance, pi_hat, estimate_proportion)
         k, last = likelihood - last, likelihood
         i += 1
     return means, variance
+
+def em_imputer():
+    return
 
 
 def gaussian_linspace(mean: float, std: float):
