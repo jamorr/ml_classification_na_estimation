@@ -29,7 +29,7 @@ def features_histograms_mean_std(data: pd.DataFrame) -> None:
     sns.histplot(stats["std"], ax=ax2)
 
 
-def read_missing(path: str, sep:str|None="\t", missing: list[str] = ["1.000000e+99"]) -> pd.DataFrame:
+def read_missing(path: str | pathlib.Path, sep:str|None="\t", missing: list[str] = ["1.000000e+99"]) -> pd.DataFrame:
     if sep is not None:
         return pd.read_csv(path, header=None, sep=sep, na_values=missing)
     else:
