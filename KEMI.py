@@ -142,7 +142,7 @@ def kEMI(complete_data , X_incomplete):
         Θi = pd.concat([df_neighbors_αi,xi])
 
         ####EMI####
-        Θi_filled_EM = EMImputer().fit_transform(Θi.values)
+        Θi_filled_EM = EMImputer().fit_transform(Θi.values, iterations=50)
         #Θi_filled_EM = SoftImpute().fit_transform(Θi.values)
         #Θi_filled_EM = IterativeImputer().fit_transform(Θi.values)
         ###########
@@ -152,13 +152,14 @@ def kEMI(complete_data , X_incomplete):
         xi_imputed = df_Θi_filled_EM.iloc[len(df_Θi_filled_EM.index)-1]
 
         xi_imputed_with_index = pd.Series(xi_imputed).rename(index_of_xi)
+
         X_observed = pd.concat([X_observed, xi_imputed_with_index])
 
         X_missing = X_missing.iloc[1:]
 
         Pt = X_observed
 
-        #break;
+        break
 
     X_observed.sort_index(inplace=True)
     all_dataset_imputed = X_observed
@@ -185,7 +186,7 @@ all_dataset_imputed = kEMI(X_incomplete , X_incomplete)
 timeFinal = (time.time() - start_time)
 print("--- %s seconds ---" % timeFinal)
 
-all_dataset_imputed.to_csv("./predictions/MissingData2_Imputed.csv",index=False ,sep=',', encoding='utf-8')
+all_dataset_imputed.to_csv("./predictions/MissingData2_Imputed.csv",index=False ,sep='\t', encoding='utf-8')
 
 # print("^^^^^^^^^^^^^^^^^^RMSE^^^^^^^^^^^^^^^^^^")
 # sum_of_RMSE = 0
@@ -200,7 +201,7 @@ all_dataset_imputed.to_csv("./predictions/MissingData2_Imputed.csv",index=False 
 # 	#print("**********************")
 # 	#print(l2_complete_data)
 # 	#print("%%%%%%%%%%%%%%%%%%%%%%")
-# 	#rms = sqrt(mean_squared_error(l2_complete_data, l1_after_imputation))
+	rms = sqrt(mean_squared_error(l2_complete_data, l1_after_imputation))
 # 	rms = rmsd(l2_complete_data, l1_after_imputation) #Root-mean-square deviation (RMSD)
 # 	nrms = nrmsd(l2_complete_data, l1_after_imputation) #Normalized root-mean-square deviation (nRMSD)
 # 	ae = aad(l2_complete_data, l1_after_imputation) #Average (=mean) absolute deviation (AAD).
