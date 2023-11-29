@@ -1,3 +1,4 @@
+from functools import reduce
 from itertools import chain
 from typing import Optional
 import numpy as np
@@ -5,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import multivariate_normal  # for generating pdf
 from sklearn.datasets import make_spd_matrix
+from sklearn.impute import SimpleImputer
 
 rng = np.random.default_rng()
 
@@ -206,6 +208,150 @@ class ExpectationMaximization:
         plt.show()
         return axes
 
+
+class EMImputer:
+
+    def __init__(self) -> None:
+        # self.true_means
+        # self.true_cov
+
+        self.__fitted = False
+        self.__predicted = False
+
+
+    def fit_transform(
+        self,
+        data:Optional[np.ndarray]=None,
+        stop: float = 1e-7,
+        iterations:int = 1000,
+        # smoothing_factor: float = 1e-20,
+        # estimate_proportion:bool=True,
+        # **kwargs
+        ):
+        """
+        Code heavily based on : https://joon3216.github.io/research_materials/2019/em_imputation_python.html
+
+        Args:
+            data (Optional[np.ndarray], optional): Data with missing values. Defaults to None.
+            stop (float, optional): Change in values to stop at. Defaults to 1e-7.
+            iterations (int, optional): Max number of iterations. Defaults to 1000.
+
+        Raises:
+            ValueError: missing data
+
+        Returns:
+            _type_: _description_
+        """
+        no_data = data is None
+
+        if no_data:
+            raise ValueError("Must include data")
+        # else:
+        self.data = data
+
+
+        num_rows, num_columns = self.data.shape
+        mask_missing = ~np.isnan(self.data)
+
+        # Collect M_i and O_i's
+        one_to_num_columns = np.arange(1, num_columns + 1, step = 1)
+        rows_w_missing = one_to_num_columns * (~mask_missing) - 1
+        rows_w_observed = one_to_num_columns * mask_missing - 1
+
+        # Generate Mu_0 and Sigma_0
+        Mu = np.nanmean(self.data, axis = 0)
+
+        # observed_rows = np.where(np.isnan(sum(self.data.T)) == False)[0]
+        observed_rows = np.where(~np.isnan(sum(self.data.T)))[0]
+        if observed_rows.size > 0:
+            cov_matrix = np.cov(self.data[observed_rows, ].T)
+        else:
+            cov_matrix = np.diag(np.nanvar(self.data, axis = 0))
+
+        if np.isnan(cov_matrix).any():
+            cov_matrix = np.diag(np.nanvar(self.data, axis = 0))
+
+        # missing_indices = np.argwhere(np.isnan(self.data))
+        # Start updating
+        Mu_tilde = {}
+        S_tilde = np.zeros((num_rows, num_columns, num_columns))
+        X_tilde = self.data.copy()
+
+        for j in range(iterations):
+            S_tilde[:] = 0  # Reset S_tilde for each iteration
+            M_i = rows_w_missing[rows_w_missing != -1]
+            O_i = rows_w_observed[rows_w_observed != -1]
+
+            # get submatrices of estimated covariance matrix
+            S_MM = cov_matrix[np.ix_(M_i, M_i)]
+            S_MO = cov_matrix[np.ix_(M_i, O_i)]
+            S_OM = S_MO.T
+            S_OO = cov_matrix[np.ix_(O_i, O_i)]
+
+            # Calculate x tilde/contribution of x tilde to mu
+            Mu_tilde['values'] = Mu[np.ix_(M_i)] + \
+                S_MO @ np.linalg.inv(S_OO) @ \
+                (X_tilde[:, O_i] - Mu[np.ix_(O_i)]).T
+            X_tilde[:, M_i] = Mu_tilde['values'].T
+
+            # Calculate contribution of x tilde to cov matrix
+            S_MM_O = S_MM - S_MO @ np.linalg.inv(S_OO) @ S_OM
+            S_tilde[:, np.ix_(M_i, M_i)] = S_MM_O
+
+            Mu_new = np.mean(X_tilde, axis=0)
+            S_new = np.cov(X_tilde.T, bias=True) + S_tilde.sum(0) / num_rows
+
+            no_conv = \
+                np.linalg.norm(Mu - Mu_new) >= stop or \
+                np.linalg.norm(cov_matrix - S_new, ord=2) >= stop
+            Mu = Mu_new
+            cov_matrix = S_new
+            np.linalg.norm(X_tilde-self.data)
+            if not no_conv:
+                print(f"Stopping after {j} iterations")
+                break
+
+        # for j in range(iterations):
+        #     for i in filter(lambda x: mask_missing[x].sum() < num_columns, range(num_rows)):
+        #         S_tilde[i] = np.zeros_like(S_tilde[i])
+        #         M_i, O_i = rows_w_missing[i, ][rows_w_missing[i, ] != -1], rows_w_observed[i, ][rows_w_observed[i, ] != -1]
+        #         # get submatrices of estimated covariance matrix
+        #         S_MM = cov_matrix[np.ix_(M_i, M_i)]
+        #         S_MO = cov_matrix[np.ix_(M_i, O_i)]
+        #         S_OM = S_MO.T
+        #         S_OO = cov_matrix[np.ix_(O_i, O_i)]
+        #         # Calculate x tilde/contribution of x tilde to mu
+        #         Mu_tilde[i] = Mu[np.ix_(M_i)] +\
+        #             S_MO @ np.linalg.inv(S_OO) @\
+        #             (X_tilde[i, O_i] - Mu[np.ix_(O_i)])
+        #         X_tilde[i, M_i] = Mu_tilde[i]
+        #         # Calculate contribution of x tilde to cov matrix
+        #         S_MM_O = S_MM - S_MO @ np.linalg.inv(S_OO) @ S_OM
+        #         S_tilde[i][np.ix_(M_i, M_i)] = S_MM_O
+
+        #     Mu_new = np.mean(X_tilde, axis = 0)
+        #     S_new = np.cov(X_tilde.T, bias = True) +  S_tilde.sum(0) / num_rows
+
+
+        #     no_conv =\
+        #         np.linalg.norm(Mu - Mu_new) >= stop or\
+        #         np.linalg.norm(cov_matrix - S_new, ord = 2) >= stop
+        #     Mu = Mu_new
+        #     cov_matrix = S_new
+
+        #     if not no_conv:
+        #         print(f"Stopping after {j} iterations")
+        #         break
+
+
+        self.mu = Mu
+        self.cov = cov_matrix
+        self.missing_cols = mask_missing
+        print("\a completed training ")
+
+        return X_tilde
+
+
 def gaussian_linspace(mean: float, std: float):
     low = mean - 6 * std
     high = mean + 6 * std
@@ -218,6 +364,10 @@ def gaussian_linspace(mean: float, std: float):
 
 
 if __name__ == "__main__":
-    data, labels = gen_data(2, 4, -10, 10, 40, 200)
-    a = ExpectationMaximization().fit(data, labels).predict(4)
-    a.plot_2d()
+    # data, labels = gen_data(2, 4, -10, 10, 40, 200)
+    # a = ExpectationMaximization().fit(data, labels).predict(4)
+    # a.plot_2d()
+    from utils import read_missing
+    data = read_missing("./missing/MissingData2.txt").T
+    # print(data.shape)
+    imputed = EMImputer().fit_transform(data.values, iterations=1000)
