@@ -1,3 +1,4 @@
+from functools import reduce
 from itertools import chain
 from typing import Optional
 import numpy as np
@@ -5,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import multivariate_normal  # for generating pdf
 from sklearn.datasets import make_spd_matrix
+from sklearn.impute import SimpleImputer
 
 rng = np.random.default_rng()
 
@@ -206,6 +208,226 @@ class ExpectationMaximization:
         plt.show()
         return axes
 
+
+class EMImputer:
+
+    def __init__(self, max_iter=100) -> None:
+        # self.true_means
+        # self.true_cov
+
+        self.__fitted = False
+        self.__predicted = False
+        self.max_iter = max_iter
+
+    # def fit_transform(
+    #     self,
+    #     data:np.ndarray,
+    #     stop: float = 1e-7,
+    #     iterations:int = 100,
+    #     # smoothing_factor: float = 1e-20,
+    #     # estimate_proportion:bool=True,
+    #     # **kwargs
+    #     ):
+    #     """
+    #     Code heavily based on : https://joon3216.github.io/research_materials/2019/em_imputation_python.html
+
+    #     Args:
+    #         data (Optional[np.ndarray], optional): Data with missing values. Defaults to None.
+    #         stop (float, optional): Change in values to stop at. Defaults to 1e-7.
+    #         iterations (int, optional): Max number of iterations. Defaults to 1000.
+
+    #     Raises:
+    #         ValueError: missing data
+
+    #     Returns:
+    #         _type_: _description_
+    #     """
+    #     no_data = data is None
+
+    #     if no_data:
+    #         raise ValueError("Must include data")
+    #     self.data = data
+
+
+    #     num_rows, num_columns = self.data.shape
+    #     mask_missing = ~np.isnan(self.data)
+
+    #     # Collect M_i and O_i's
+    #     one_to_num_columns = np.arange(1, num_columns + 1, step = 1)
+    #     rows_w_missing = one_to_num_columns * (~mask_missing) - 1
+    #     rows_w_observed = one_to_num_columns * mask_missing - 1
+
+    #     # Generate Mu_0 and Sigma_0
+    #     Mu = np.nanmean(self.data, axis = 0)
+
+    #     # observed_rows = np.where(np.isnan(sum(self.data.T)) == False)[0]
+    #     observed_rows = np.where(~np.isnan(sum(self.data.T)))[0]
+    #     if observed_rows.size > 0:
+    #         cov_matrix = np.cov(self.data[observed_rows, ].T)
+    #     else:
+    #         cov_matrix = np.diag(np.nanvar(self.data, axis = 0))
+
+    #     if np.isnan(cov_matrix).any():
+    #         cov_matrix = np.diag(np.nanvar(self.data, axis = 0))
+
+    #     # missing_indices = np.argwhere(np.isnan(self.data))
+    #     # Start updating
+    #     Mu_tilde = {}
+    #     S_tilde = np.zeros((num_rows, num_columns, num_columns))
+    #     X_tilde = self.data.copy()
+
+    #     # for j in range(iterations):
+    #     #     S_tilde[:] = 0  # Reset S_tilde for each iteration
+    #     #     M_i = rows_w_missing[rows_w_missing != -1]
+    #     #     O_i = rows_w_observed[rows_w_observed != -1]
+
+    #     #     # get submatrices of estimated covariance matrix
+    #     #     S_MM = cov_matrix[np.ix_(M_i, M_i)]
+    #     #     S_MO = cov_matrix[np.ix_(M_i, O_i)]
+    #     #     S_OM = S_MO.T
+    #     #     S_OO = cov_matrix[np.ix_(O_i, O_i)]
+
+    #     #     # Calculate x tilde/contribution of x tilde to mu
+    #     #     Mu_tilde['values'] = Mu[np.ix_(M_i)] + \
+    #     #         S_MO @ np.linalg.inv(S_OO) @ \
+    #     #         (X_tilde[:, O_i] - Mu[np.ix_(O_i)]).T
+    #     #     X_tilde[:, M_i] = Mu_tilde['values'].T
+
+    #     #     # Calculate contribution of x tilde to cov matrix
+    #     #     S_MM_O = S_MM - S_MO @ np.linalg.inv(S_OO) @ S_OM
+    #     #     S_tilde[:, np.ix_(M_i, M_i)] = S_MM_O
+
+    #     #     Mu_new = np.mean(X_tilde, axis=0)
+    #     #     S_new = np.cov(X_tilde.T, bias=True) + S_tilde.sum(0) / num_rows
+
+    #     #     no_conv = \
+    #     #         np.linalg.norm(Mu - Mu_new) >= stop or \
+    #     #         np.linalg.norm(cov_matrix - S_new, ord=2) >= stop
+    #     #     Mu = Mu_new
+    #     #     cov_matrix = S_new
+    #     #     np.linalg.norm(X_tilde-self.data)
+    #     #     if not no_conv:
+    #     #         print(f"Stopping after {j} iterations")
+    #     #         break
+
+    #     for j in range(iterations):
+    #         for i in filter(lambda x: mask_missing[x].sum() < num_columns, range(num_rows)):
+    #             S_tilde[i] = np.zeros_like(S_tilde[i])
+    #             M_i, O_i = rows_w_missing[i, ][rows_w_missing[i, ] != -1], rows_w_observed[i, ][rows_w_observed[i, ] != -1]
+    #             # get submatrices of estimated covariance matrix
+    #             S_MM = cov_matrix[np.ix_(M_i, M_i)]
+    #             S_MO = cov_matrix[np.ix_(M_i, O_i)]
+    #             S_OM = S_MO.T
+    #             S_OO = cov_matrix[np.ix_(O_i, O_i)]
+    #             # Calculate x tilde/contribution of x tilde to mu
+    #             Mu_tilde[i] = Mu[np.ix_(M_i)] +\
+    #                 S_MO @ np.linalg.inv(S_OO) @\
+    #                 (X_tilde[i, O_i] - Mu[np.ix_(O_i)])
+    #             X_tilde[i, M_i] = Mu_tilde[i]
+    #             # Calculate contribution of x tilde to cov matrix
+    #             S_MM_O = S_MM - S_MO @ np.linalg.inv(S_OO) @ S_OM
+    #             S_tilde[i][np.ix_(M_i, M_i)] = S_MM_O
+
+    #         Mu_new = np.mean(X_tilde, axis = 0)
+    #         S_new = np.cov(X_tilde.T, bias = True) +  S_tilde.sum(0) / num_rows
+
+
+    #         no_conv =\
+    #             np.linalg.norm(Mu - Mu_new) >= stop or\
+    #             np.linalg.norm(cov_matrix - S_new, ord = 2) >= stop
+    #         Mu = Mu_new
+    #         cov_matrix = S_new
+
+    #         if not no_conv:
+    #             print(f"Stopping after {j} iterations")
+    #             break
+
+
+    #     self.mu = Mu
+    #     self.cov = cov_matrix
+    #     self.missing_cols = mask_missing
+    #     print("\a completed training ")
+
+    #     return X_tilde
+
+    def fit_transform(self, X, eps = 1e-08):
+        '''(np.array, int, number) -> {str: np.array or int}
+
+        Precondition: max_iter >= 1 and eps > 0
+
+        Return the dictionary with five keys where:
+        - Key 'mu' stores the mean estimate of the imputed data.
+        - Key 'Sigma' stores the variance estimate of the imputed data.
+        - Key 'X_imputed' stores the imputed data that is mutated from X using
+        the EM algorithm.
+        - Key 'C' stores the np.array that specifies the original missing entries
+        of X.
+        - Key 'iteration' stores the number of iteration used to compute
+        'X_imputed' based on max_iter and eps specified.
+        '''
+        max_iter = self.max_iter
+        nr, nc = X.shape
+        C = np.isnan(X) == False
+
+        # Collect M_i and O_i's
+        one_to_nc = np.arange(1, nc + 1, step = 1)
+        M = one_to_nc * (C == False) - 1
+        O = one_to_nc * C - 1
+
+        # Generate Mu_0 and Sigma_0
+        Mu = np.nanmean(X, axis = 0)
+        observed_rows = np.where(np.isnan(sum(X.T)) == False)[0]
+        S = np.cov(X[observed_rows, ].T)
+
+        observed_rows = np.where(~np.isnan(sum(X.T)))[0]
+        if observed_rows.size > 0:
+            cov_matrix = np.cov(X[observed_rows, ].T)
+        else:
+            cov_matrix = np.diag(np.nanvar(X, axis = 0))
+
+        if np.isnan(cov_matrix).any():
+            cov_matrix = np.diag(np.nanvar(X, axis = 0))
+        # Start updating
+        Mu_tilde, S_tilde = {}, {}
+        X_tilde = X.copy()
+        no_conv = True
+        iteration = 0
+        while no_conv and iteration < max_iter:
+            for i in range(nr):
+                S_tilde[i] = np.zeros(nc ** 2).reshape(nc, nc)
+                if set(O[i, ]) != set(one_to_nc - 1): # missing component exists
+                    M_i, O_i = M[i, ][M[i, ] != -1], O[i, ][O[i, ] != -1]
+                    S_MM = S[np.ix_(M_i, M_i)]
+                    S_MO = S[np.ix_(M_i, O_i)]
+                    S_OM = S_MO.T
+                    S_OO = S[np.ix_(O_i, O_i)]
+                    Mu_tilde[i] = Mu[np.ix_(M_i)] +\
+                        S_MO @ np.linalg.inv(S_OO) @\
+                        (X_tilde[i, O_i] - Mu[np.ix_(O_i)])
+                    X_tilde[i, M_i] = Mu_tilde[i]
+                    S_MM_O = S_MM - S_MO @ np.linalg.inv(S_OO) @ S_OM
+                    S_tilde[i][np.ix_(M_i, M_i)] = S_MM_O
+            Mu_new = np.mean(X_tilde, axis = 0)
+            S_new = np.cov(X_tilde.T, bias = 1) +\
+                reduce(np.add, S_tilde.values()) / nr
+            no_conv =\
+                np.linalg.norm(Mu - Mu_new) >= eps or\
+                np.linalg.norm(S - S_new, ord = 2) >= eps
+            Mu = Mu_new
+            S = S_new
+            iteration += 1
+
+        result = {
+            'mu': Mu,
+            'Sigma': S,
+            'X_imputed': X_tilde,
+            'C': C,
+            'iteration': iteration
+        }
+
+        return X_tilde
+
+
 def gaussian_linspace(mean: float, std: float):
     low = mean - 6 * std
     high = mean + 6 * std
@@ -218,6 +440,10 @@ def gaussian_linspace(mean: float, std: float):
 
 
 if __name__ == "__main__":
-    data, labels = gen_data(2, 4, -10, 10, 40, 200)
-    a = ExpectationMaximization().fit(data, labels).predict(4)
-    a.plot_2d()
+    # data, labels = gen_data(2, 4, -10, 10, 40, 200)
+    # a = ExpectationMaximization().fit(data, labels).predict(4)
+    # a.plot_2d()
+    from utils import read_missing
+    data = read_missing("./missing/MissingData2.txt").T
+    # print(data.shape)
+    imputed = EMImputer().fit_transform(data.values, iterations=1000)
