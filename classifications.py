@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.preprocessing import MinMaxScaler,StandardScaler
 from sklearn.model_selection import KFold, cross_val_score,GridSearchCV
@@ -16,10 +17,30 @@ from sklearn.tree import DecisionTreeClassifier
 from utils import read_classification_dataset
 
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+class ConditionalImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, imputer):
+        self.imputer = imputer
+
+    def fit(self, X, y=None):
+        if np.isnan(X).any():
+            self.imputer.fit(X, y)
+        return self
+
+    def transform(self, X, y=None):
+        if np.isnan(X).any():
+            return self.imputer.transform(X)
+        return X
+    
+    
 def modeltest(idnum:int):
     print(f"Finding best model for Classifier{idnum}")
     train,target,test = read_classification_dataset(idnum)
-    X, y = train.values, target.values.flatten()
+    imputed = SimpleImputer().fit_transform(train)
+
+    X, y = imputed, target.values.flatten()
     candidates = [
         RandomForestClassifier(
           # max_depth=4,
@@ -39,23 +60,23 @@ def modeltest(idnum:int):
     params = [
         #Random Forest
         {   "clf__max_depth":[None,1,2,3,4,5],
-            "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+            # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
         },
         #KNN
         {
         "clf__n_neighbors":[3,5,7,9,11],
-        "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
 
         },
         #Decision Tree
         {
-        "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
         "clf__max_depth":[None,1,2,3,4,5],
         "clf__splitter":["best","random"]
         },
         #Support Vector Classifier
         {
-        "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
         'clf__kernel':['linear','sigmoid','rbf','poly'],
         "clf__gamma":['scale','auto'],
         }
@@ -70,7 +91,7 @@ def modeltest(idnum:int):
             ('Scaler', StandardScaler()), 
             ('clf', clf)
         ])
-        grid = GridSearchCV(pipeline, param_grid=par, scoring='f1_weighted', cv=5, verbose=True)
+        grid = GridSearchCV(pipeline, param_grid=par, scoring='f1_weighted', cv=5)
         grid.fit(X, y=y)
 
         if grid.best_score_ > best_model_score:
@@ -83,27 +104,13 @@ def modeltest(idnum:int):
     joblib.dump(best_model, best_model_path)
 
     print(f"Best Model for Classification {idnum}: {best_model_name} with score {best_model_score}")
-    print(f"Best Model Parameters: {best_model_params}")
+    print(f"Best Model Parameters: {best_model_params}\n")
     best_model.fit(train,target)
     np.savetxt(f"TestLabel{idnum}.txt",best_model.predict(test),delimiter="\n")
-
+    return best_model
 if __name__ == "__main__":
-    # for i in range(1,5):
-        # modeltest(i)
-    modeltest(3)
-
-
-
-
-
-# for i in range (1,5):
-#     modeltest()
-
-
-
-
-
-
+    for i in [1,2,3,4,5]:
+        modeltest(i)
 
 
 
