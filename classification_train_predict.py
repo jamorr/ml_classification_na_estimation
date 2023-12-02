@@ -15,6 +15,8 @@ import joblib
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from utils import read_classification_dataset
+from sklearnex import patch_sklearn
+patch_sklearn()
 
 
 import warnings
@@ -33,8 +35,8 @@ class ConditionalImputer(BaseEstimator, TransformerMixin):
         if np.isnan(X).any():
             return self.imputer.transform(X)
         return X
-    
-    
+
+
 def modeltest(idnum:int):
     print(f"Finding best model for Classifier{idnum}")
     train,target,test = read_classification_dataset(idnum)
@@ -59,26 +61,23 @@ def modeltest(idnum:int):
     classifier_names = ["rforest","knn","dtree","SVC"]
     params = [
         #Random Forest
-        {   "clf__max_depth":[None,1,2,3,4,5],
-            # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+        {
+            "clf__max_depth":[None,1,2,3,4,5],
         },
         #KNN
         {
-        "clf__n_neighbors":[3,5,7,9,11],
-        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
+            "clf__n_neighbors":[3,5,7,9,11],
 
         },
         #Decision Tree
         {
-        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
-        "clf__max_depth":[None,1,2,3,4,5],
-        "clf__splitter":["best","random"]
+            "clf__max_depth":[None,1,2,3,4,5],
+            "clf__splitter":["best","random"]
         },
         #Support Vector Classifier
         {
-        # "Imputer":[SimpleImputer(),KNNImputer(weights="distance")],
-        'clf__kernel':['linear','sigmoid','rbf','poly'],
-        "clf__gamma":['scale','auto'],
+            'clf__kernel':['linear','sigmoid','rbf','poly'],
+            "clf__gamma":['scale','auto'],
         }
     ]
     best_model_score = -1  # Initialize with a score that will be definitely lower than any F1 score
@@ -87,11 +86,11 @@ def modeltest(idnum:int):
 
     for clf, par, name in zip(candidates, params, classifier_names):
         pipeline = Pipeline([
-            ('Imputer', KNNImputer(weights="distance")), 
-            ('Scaler', StandardScaler()), 
+            ('Imputer', KNNImputer(weights="distance")),
+            ('Scaler', StandardScaler()),
             ('clf', clf)
         ])
-        grid = GridSearchCV(pipeline, param_grid=par, scoring='f1_weighted', cv=5)
+        grid = GridSearchCV(pipeline, param_grid=par, scoring='f1_macro', cv=5)
         grid.fit(X, y=y)
 
         if grid.best_score_ > best_model_score:
@@ -108,6 +107,8 @@ def modeltest(idnum:int):
     best_model.fit(train,target)
     np.savetxt(f"./predictions/TestLabel{idnum}.txt",best_model.predict(test),delimiter="\n")
     return best_model
+
+
 if __name__ == "__main__":
     for i in [1,2,3,4,5]:
         modeltest(i)
