@@ -95,3 +95,4 @@ typing_extensions==4.8.0
 tzdata==2023.3
 wcwidth==0.2.11
 zipp==3.17.0
+matplotlib

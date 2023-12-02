@@ -5,19 +5,24 @@ import pathlib
 import os
 
 def read_classification_dataset(number: int = 1) -> tuple[pd.DataFrame, ...]:
+    missing: list[str] = ["1.000000e+99"]
     path_to_data = pathlib.Path(os.path.dirname(__file__))
-    print(path_to_data)
     match number:
         case 1:
             sep1 = sep2 = "\t"
+            missing.append("1.0")
         case 3:
             sep1 = "\t"
             sep2 = ","
+        case 2:
+            sep1 = sep2 = None
+            missing = ["1.30103"]
         case _:
             sep1 = sep2 = None
-    train = read_missing(path_to_data/"classify"/f"TrainData{number}.txt", sep=sep1)
-    target = read_missing(path_to_data/"classify"/f"TrainLabel{number}.txt")
-    test = read_missing(path_to_data/"classify"/f"TestData{number}.txt", sep=sep2)
+
+    train = read_missing(path_to_data/"classify"/f"TrainData{number}.txt", sep=sep1, missing=missing)
+    target = read_missing(path_to_data/"classify"/f"TrainLabel{number}.txt", missing=missing)
+    test = read_missing(path_to_data/"classify"/f"TestData{number}.txt", sep=sep2, missing=missing)
     return train, target, test
 
 

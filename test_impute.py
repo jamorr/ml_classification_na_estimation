@@ -1,6 +1,7 @@
 import joblib
 import exp_max
 import soft_impute
+import svd_impute
 from sklearn.impute import KNNImputer, SimpleImputer
 import pandas as pd
 import numpy as np
@@ -57,9 +58,12 @@ def iterative_impute_test(data:np.ndarray, imputer, n_iterations:int=2, **kwargs
     # missing_indices = np.argwhere(np.isnan(data))
     missing_mask = np.isnan(data)
     last_impute = imputed_data = imputer(**kwargs).fit_transform(data.copy())
+    percent_missing = missing_mask.sum().sum()/missing_mask.size
+    print(f"{percent_missing*100:.3f}% missing...")
     scores = []
     for _ in range(n_iterations):
-        new_imputed = imputer(**kwargs).fit_transform(create_MAR(last_impute.copy(), missing_mask, missing_mask.sum().sum()/missing_mask.size))
+        removed = create_MAR(last_impute.copy(), missing_mask, percent_missing)
+        new_imputed = imputer(**kwargs).fit_transform(removed)
         scores.append(rmse(new_imputed, imputed_data))
         last_impute = new_imputed
 
@@ -74,18 +78,44 @@ def main():
     datasets[3] = utils.read_missing("./missing/MissingData3.txt").T.values
     impute_methods = {
         SimpleImputer:{"strategy":"mean"},
-        KNNImputer:{"n_neighbors":1,'weights':'distance'},
+        KNNImputer:{"n_neighbors":2,'weights':'distance'},
         soft_impute.SoftImputer:{},
+        svd_impute.SVDImpute:{},
         # exp_max.EMImputer:{"max_iter":10},
     }
     for k, v in datasets.items():
         print(f"MissingData{k}:")
         scores = {}
         for imputer, kwargs in impute_methods.items():
+            print(f"Starting {imputer.__name__}... ", end="")
+
+            try:
+                scores[imputer.__name__] = iterative_impute_test(v, imputer, n_iterations=2, **kwargs)
+
+            except np.linalg.LinAlgError:
+                print("Failed :(")
+                continue
+            else:
+                print("Completed!")
+
+        print("RMSE")
+        print(pd.DataFrame(scores))
+    del impute_methods[soft_impute.SoftImputer]
+    classify_datasets = {}
+    classify_datasets[1] = utils.read_classification_dataset(1)[0].values
+    classify_datasets[2] = utils.read_classification_dataset(2)[0].values
+    for k, v in classify_datasets.items():
+        print(f"ClassifyData{k} Train:")
+        scores = {}
+        for imputer, kwargs in impute_methods.items():
+            print(f"Starting {imputer.__name__}... ", end="")
             try:
                 scores[imputer.__name__] = iterative_impute_test(v, imputer, n_iterations=2, **kwargs)
             except np.linalg.LinAlgError:
+                print("Failed :(")
                 continue
+            else:
+                print("Completed!")
         print("RMSE")
         print(pd.DataFrame(scores))
 
