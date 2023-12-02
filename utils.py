@@ -21,7 +21,7 @@ def read_classification_dataset(number: int = 1) -> tuple[pd.DataFrame, ...]:
             sep1 = sep2 = None
 
     train = read_missing(path_to_data/"classify"/f"TrainData{number}.txt", sep=sep1, missing=missing)
-    target = read_missing(path_to_data/"classify"/f"TrainLabel{number}.txt", missing=missing)
+    target = read_missing(path_to_data/"classify"/f"TrainLabel{number}.txt")
     test = read_missing(path_to_data/"classify"/f"TestData{number}.txt", sep=sep2, missing=missing)
     return train, target, test
 
