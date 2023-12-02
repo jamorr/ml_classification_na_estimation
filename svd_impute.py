@@ -14,7 +14,7 @@ patch_sklearn()
 F32PREC = np.finfo(np.float32).eps
 
 
-class SVDImpute(BaseEstimator, TransformerMixin):
+class SVDImputer(BaseEstimator, TransformerMixin):
     def __init__(self,max_iterations: int = 1000, stop_threshold: float = 1e-5 ) -> None:
         self.__fit = False
         self.stop_threshold = stop_threshold
@@ -69,9 +69,9 @@ class SVDImpute(BaseEstimator, TransformerMixin):
         self.mask = ~np.isnan(X)
         self.preprocessor = SimpleImputer()
         self.data = self.preprocessor.fit_transform(X)
+        k = self._find_optimal_k(self.data)
 
         for _ in range(self.max_iterations):
-            k = self._find_optimal_k(self.data)
 
             if self.data.shape[0] * self.data.shape[1] > 1e6:
                 u, s, vt = randomized_svd(self.data, n_components=k)
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     import utils
 
     data = utils.read_missing("./missing/MissingData1.txt")
-    model = SVDImpute()
+    model = SVDImputer()
     ft_data = model.fit_transform(data)
     print(data.shape)
     t_data = model.test_transform(data)
