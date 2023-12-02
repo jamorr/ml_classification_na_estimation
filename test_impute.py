@@ -13,8 +13,13 @@ import utils
 
 
 def rmse(d1, d2):
-    return np.linalg.norm(d1 - d2, ord="fro")
+    return np.linalg.norm(d1 - d2, ord=2)
 
+def nrmse(d1, d2):
+    diff = d1 - d2
+    msse = (diff.T@diff)/len(diff)
+    vari = np.var(d2)
+    return np.sqrt(msse/vari)
 
 def create_MAR(
     data: np.ndarray,
@@ -64,7 +69,7 @@ def create_MAR(
 
 
 def iterative_impute_test(
-    data: np.ndarray, imputer, n_iterations: int = 2, **kwargs
+    data: np.ndarray, imputer, n_iterations: int = 2, scoring=rmse, **kwargs
 ) -> list:
     # missing_indices = np.argwhere(np.isnan(data))
     missing_mask = np.isnan(data)
@@ -76,10 +81,12 @@ def iterative_impute_test(
     for _ in range(n_iterations):
         removed = create_MAR(last_impute.copy(), missing_mask, percent_missing)
         new_imputed = imputer(**kwargs).fit_transform(removed)
-        scores.append(rmse(new_imputed, imputed_data))
+        score = scoring(new_imputed[~missing_mask], data[~missing_mask])
+        print(score)
+        scores.append(score)
         last_impute = new_imputed
 
-    return scores
+    return scores, imputed_data
 
 
 def main():
@@ -90,22 +97,24 @@ def main():
     datasets[2] = utils.read_missing("./missing/MissingData2.txt").T.values
     datasets[3] = utils.read_missing("./missing/MissingData3.txt").T.values
     impute_methods = {
-        SimpleImputer: {"strategy": "mean"},
-        KNNImputer: {"n_neighbors": 2, "weights": "distance"},
-        svd_impute.SVDImpute: {"max_iterations":100},
         # IterativeImputer:{},
-        soft_impute.SoftImputer: {"max_iterations":100},
+        soft_impute.SoftImputer: {"max_iterations":1000,"lmbd":0.07},
+        svd_impute.SVDImputer: {"max_iterations":1000},
+        KNNImputer: {"n_neighbors": 2, "weights": "distance"},
+        SimpleImputer: {"strategy": "mean"},
         # exp_max.EMImputer:{"max_iter":10},
     }
+    best_scores = [0.1025, 0.143, 0.66092886]
     for k, v in datasets.items():
         print(f"MissingData{k}:")
         scores = {}
+        best_score = best_scores[k-1]
         for imputer, kwargs in impute_methods.items():
             print(f"Starting {imputer.__name__}... ", end="")
 
             try:
-                scores[imputer.__name__] = iterative_impute_test(
-                    v, imputer, n_iterations=2, **kwargs
+                scores[imputer.__name__], candidate = iterative_impute_test(
+                    v, imputer, n_iterations=2,scoring=nrmse, **kwargs
                 )
 
             except np.linalg.LinAlgError:
@@ -113,29 +122,30 @@ def main():
                 continue
             else:
                 print("Completed!")
+            if scores[imputer.__name__][0] < best_score:
+                np.savetxt(f"./predictions/MissingData{k}.txt", candidate, delimiter="\t")
 
         print("RMSE")
         print(pd.DataFrame(scores))
-    del impute_methods[soft_impute.SoftImputer]
-    classify_datasets = {}
-    classify_datasets[1] = utils.read_classification_dataset(1)[0].values
-    classify_datasets[2] = utils.read_classification_dataset(2)[0].values
-    for k, v in classify_datasets.items():
-        print(f"ClassifyData{k} Train:")
-        scores = {}
-        for imputer, kwargs in impute_methods.items():
-            print(f"Starting {imputer.__name__}... ", end="")
-            try:
-                scores[imputer.__name__] = iterative_impute_test(
-                    v, imputer, n_iterations=2, **kwargs
-                )
-            except np.linalg.LinAlgError:
-                print("Failed :(")
-                continue
-            else:
-                print("Completed!")
-        print("RMSE")
-        print(pd.DataFrame(scores))
+    # classify_datasets = {}
+    # classify_datasets[1] = utils.read_classification_dataset(1)[0].values
+    # classify_datasets[2] = utils.read_classification_dataset(2)[0].values
+    # for k, v in classify_datasets.items():
+    #     print(f"ClassifyData{k} Train:")
+    #     scores = {}
+    #     for imputer, kwargs in impute_methods.items():
+    #         print(f"Starting {imputer.__name__}... ", end="")
+    #         try:
+    #             scores[imputer.__name__], candidate = iterative_impute_test(
+    #                 v, imputer, n_iterations=2, scoring=nrmse,**kwargs
+    #             )
+    #         except np.linalg.LinAlgError:
+    #             print("Failed :(")
+    #             continue
+    #         else:
+    #             print("Completed!")
+    #     print("RMSE")
+    #     print(pd.DataFrame(scores))
 
 
 if __name__ == "__main__":
