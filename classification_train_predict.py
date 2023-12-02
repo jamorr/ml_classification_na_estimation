@@ -106,7 +106,7 @@ def modeltest(idnum:int):
     print(f"Best Model for Classification {idnum}: {best_model_name} with score {best_model_score}")
     print(f"Best Model Parameters: {best_model_params}\n")
     best_model.fit(train,target)
-    np.savetxt(f"TestLabel{idnum}.txt",best_model.predict(test),delimiter="\n")
+    np.savetxt(f"./predictions/TestLabel{idnum}.txt",best_model.predict(test),delimiter="\n")
     return best_model
 if __name__ == "__main__":
     for i in [1,2,3,4,5]:
