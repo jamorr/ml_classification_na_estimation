@@ -17,6 +17,8 @@ def test_model_on_data(model, data_set_number:int):
 
     except ValueError as e:
         print(e)
+
+
 for i in range(1,6):
     model = joblib.load(f"./models/c_{i}_best_model.pkl")
     test_model_on_data(model, i)

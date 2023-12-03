@@ -100,14 +100,14 @@ def main():
 
 
     impute_methods = {
-        # IterativeImputer:{},
+        IterativeImputer:{},
         soft_impute.SoftImputer: {"max_iterations":1000,"lmbd":0.07},
         svd_impute.SVDImputer: {"max_iterations":1000},
         KNNImputer: {"n_neighbors": 2, "weights": "distance"},
         SimpleImputer: {"strategy": "mean"},
         # exp_max.EMImputer:{"max_iter":10},
     }
-    best_scores = [0.1025, 0.143, 0.66092886]
+    best_scores = [0.1025, 0.135112, 0.66092886]
     for k, v in datasets.items():
         print(f"MissingData{k}:")
         eigen = np.sqrt(np.abs(np.linalg.eigvals(np.cov(SimpleImputer().fit_transform(v)))))
