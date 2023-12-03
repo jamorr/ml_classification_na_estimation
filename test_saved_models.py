@@ -2,8 +2,18 @@ import os
 import joblib
 import numpy as np
 from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import f1_score
 from utils import read_classification_dataset
 
+import warnings
+try:
+    from sklearnex import patch_sklearn
+
+    patch_sklearn()
+except:
+    pass
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # Function to save predictions to a text file
 def save_predictions(predictions, model_name):
@@ -27,6 +37,7 @@ else:
 
             # Make predictions on the test set
             predictions = model.predict(test.values)
-            print(cross_val_score(model,X=train.values, y=label.values.flatten(), scoring='f1_macro'))
             # Save predictions to a text file
             save_predictions(predictions, filename[:-4])  # Remove '.pkl' extension from filename
+            print(cross_val_score(model,X=train.values, y=label.values.flatten(), scoring='f1_macro'))
+
