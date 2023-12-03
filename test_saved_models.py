@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def save_predictions(predictions, model_name):
     output_filename = f"./predictions/{model_name}_predictions.txt"
     np.savetxt(output_filename, predictions, fmt="%d")
-    # print(f"Predictions saved to {output_filename}")
+    print(f"Predictions saved to {output_filename}")
 
 # Main script
 models_folder = "models"
