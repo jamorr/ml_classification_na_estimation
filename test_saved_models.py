@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def save_predictions(predictions, model_name):
     output_filename = f"./predictions/{model_name}_predictions.txt"
     np.savetxt(output_filename, predictions, fmt="%d")
-    print(f"Predictions saved to {output_filename}")
+    # print(f"Predictions saved to {output_filename}")
 
 # Main script
 models_folder = "models"
@@ -39,5 +39,6 @@ else:
             predictions = model.predict(test.values)
             # Save predictions to a text file
             save_predictions(predictions, filename[:-4])  # Remove '.pkl' extension from filename
-            print(cross_val_score(model,X=train.values, y=label.values.flatten(), scoring='f1_macro'))
+            scores = cross_val_score(model,X=train.values, y=label.values.flatten(), scoring='f1_macro')
+            print(f"average = {scores.mean()}, std = {scores.std()}")
 
