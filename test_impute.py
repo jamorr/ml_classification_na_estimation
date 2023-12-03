@@ -74,6 +74,8 @@ def iterative_impute_test(
     # missing_indices = np.argwhere(np.isnan(data))
     missing_mask = np.isnan(data)
     last_impute = imputed_data = imputer(**kwargs).fit_transform(data.copy())
+
+
     percent_missing = missing_mask.sum().sum() / missing_mask.size
     print(f"{percent_missing*100:.3f}% missing...", end="")
 
@@ -82,7 +84,6 @@ def iterative_impute_test(
         removed = create_MAR(last_impute.copy(), missing_mask, percent_missing)
         new_imputed = imputer(**kwargs).fit_transform(removed)
         score = scoring(new_imputed[~missing_mask], data[~missing_mask])
-        print(score)
         scores.append(score)
         last_impute = new_imputed
 
@@ -93,9 +94,9 @@ def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
     datasets = {}
-    datasets[1] = utils.read_missing("./missing/MissingData1.txt").T
-    datasets[2] = utils.read_missing("./missing/MissingData2.txt").T
-    datasets[3] = utils.read_missing("./missing/MissingData3.txt").T
+    datasets[1] = utils.read_missing("./missing/MissingData1.txt").T.values
+    datasets[2] = utils.read_missing("./missing/MissingData2.txt").T.values
+    datasets[3] = utils.read_missing("./missing/MissingData3.txt").T.values
 
 
     impute_methods = {
@@ -109,10 +110,10 @@ def main():
     best_scores = [0.1025, 0.143, 0.66092886]
     for k, v in datasets.items():
         print(f"MissingData{k}:")
-        eigen = np.sqrt(np.abs(np.linalg.eigvals(v.cov().values)))
+        eigen = np.sqrt(np.abs(np.linalg.eigvals(np.cov(SimpleImputer().fit_transform(v)))))
         eigen = eigen/eigen.sum()
         entropy = -sum([e*np.log(e) for e in eigen[np.nonzero(eigen)]])/np.log(np.count_nonzero(eigen))
-        print("Covariance Matrix Entropy: ", entropy)
+        print(f"Covariance Matrix Entropy: {entropy:.3f}")
         scores = {}
         best_score = best_scores[k-1]
         for imputer, kwargs in impute_methods.items():
@@ -120,7 +121,7 @@ def main():
 
             try:
                 scores[imputer.__name__], candidate = iterative_impute_test(
-                    v.values, imputer, n_iterations=2,scoring=nrmse, **kwargs
+                    v, imputer, n_iterations=2,scoring=nrmse, **kwargs
                 )
 
             except np.linalg.LinAlgError:
